@@ -1,6 +1,6 @@
 {
   "name": "pi-lua",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Write pi extensions in Lua: one tiny TypeScript adapter, everything else is Lua plugins",
   "keywords": [
     "pi-package",
