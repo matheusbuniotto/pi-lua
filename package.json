@@ -1,0 +1,40 @@
+{
+  "name": "pi-lua",
+  "version": "0.1.0",
+  "description": "Lua-powered extensions for pi: a lua tool, a Lua-scripted statusline, and a plugins.lua package manager",
+  "keywords": [
+    "pi-package",
+    "lua"
+  ],
+  "license": "MIT",
+  "author": "Matheus Buniotto <matheus.buniotto@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/matheusbuniotto/pi-lua.git"
+  },
+  "homepage": "https://github.com/matheusbuniotto/pi-lua#readme",
+  "bugs": {
+    "url": "https://github.com/matheusbuniotto/pi-lua/issues"
+  },
+  "type": "module",
+  "files": [
+    "src",
+    "lua",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "luac -p lua/*.lua"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./src/lua-tool.ts",
+      "./src/statusline.ts",
+      "./src/plugin-manager.ts"
+    ]
+  }
+}
