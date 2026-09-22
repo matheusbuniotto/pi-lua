@@ -40,9 +40,11 @@ Enter toggles; Esc closes and, if anything changed, reloads pi to apply it. Turn
 }
 ```
 
-A disabled plugin isn't loaded, so its commands and tools only show up in the menu once it's enabled.
+Turning a plugin off turns its commands and tools off with it; turning it back on restores them as you had them. A disabled plugin isn't loaded, so after the reload its commands and tools only show up in the menu once it's enabled again.
 
 ## Write your own plugin
+
+**New to this? Follow the step-by-step guide: [Building pi-lua plugins](docs/plugins.md)**, which builds a focus timer covering commands, the footer, events, a tool and a full-screen view.
 
 Drop a `.lua` file in `~/.pi/agent/lua/` and run `/reload`. No TypeScript, no build step. A file with the same name as a bundled plugin (e.g. `dashboard.lua`) replaces it, so copying one out of `lua/plugins/` is an easy way to start customizing.
 
@@ -88,6 +90,7 @@ pi.screen({                                  -- full-screen surface (raw ANSI al
 | `ctx.cwd`, `ctx.model`, `ctx.has_ui` | session info |
 | `ctx.session_file` | the session `.jsonl` (one JSON entry per line), or `nil` until pi first saves it |
 | `ctx.context` | `{ tokens, window, percent }`, or `nil` before the first turn |
+| `ctx.send(text)` | send a user message to the agent; queued as a follow-up if it's busy |
 | `ctx.ui.notify(message, level?)` | `"info"` (default), `"warning"`, `"error"` |
 | `ctx.ui.set_status(key, line)` | a footer line; `nil` clears it |
 | `ctx.ui.set_widget(key, lines)` | lines above the editor; `nil` clears them |

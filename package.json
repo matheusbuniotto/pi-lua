@@ -24,7 +24,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "check": "luac -p lua/*.lua lua/plugins/*.lua"
+    "check": "luac -p lua/*.lua lua/plugins/*.lua docs/*.lua"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

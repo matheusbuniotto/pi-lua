@@ -91,7 +91,8 @@ type LuaMessage =
 	| { type: "ui"; op: "set_widget"; key: string; lines?: Line[] }
 	| { type: "ui"; op: "screen_open"; key: string; help?: string }
 	| { type: "ui"; op: "screen_frame"; key: string; lines?: Line[] }
-	| { type: "ui"; op: "screen_close"; key: string };
+	| { type: "ui"; op: "screen_close"; key: string }
+	| { type: "send"; text: string };
 
 // The Lua process -------------------------------------------------------------
 
@@ -109,10 +110,12 @@ class LuaRuntime {
 	private lastCtx?: ExtensionContext;
 	private stopped = false;
 	private child: ChildProcess;
+	private sendUserMessage: ExtensionAPI["sendUserMessage"];
 	readonly ready: Promise<Manifest>;
 
-	private constructor(child: ChildProcess) {
+	private constructor(child: ChildProcess, sendUserMessage: ExtensionAPI["sendUserMessage"]) {
 		this.child = child;
+		this.sendUserMessage = sendUserMessage;
 		this.ready = new Promise((resolve, reject) => {
 			const stderr: string[] = [];
 			child.stderr?.on("data", (chunk) => stderr.push(String(chunk)));
@@ -145,9 +148,9 @@ class LuaRuntime {
 		});
 	}
 
-	static start(plugins: string[]): LuaRuntime {
+	static start(plugins: string[], sendUserMessage: ExtensionAPI["sendUserMessage"]): LuaRuntime {
 		const child = spawn(LUA_BIN, [RUNTIME, ...plugins], { stdio: ["pipe", "ignore", "pipe", "pipe"] });
-		return new LuaRuntime(child);
+		return new LuaRuntime(child, sendUserMessage);
 	}
 
 	/** Send a message and wait for the Lua side to finish handling it. */
@@ -177,6 +180,14 @@ class LuaRuntime {
 		// Lua handles one message at a time, so UI updates belong to the
 		// oldest request still in flight.
 		const ctx = this.pending.values().next().value?.ctx ?? this.lastCtx;
+
+		if (message.type === "send") {
+			// Lua is mid-callback, so the agent is often busy: queue behind it.
+			const idle = ctx?.isIdle() ?? true;
+			this.sendUserMessage(message.text, idle ? undefined : { deliverAs: "followUp" });
+			return;
+		}
+
 		if (!ctx?.hasUI) return;
 
 		if (message.type === "error") {
@@ -348,42 +359,61 @@ function fromIds(ids: Set<string>): Config {
 
 // Each plugin, with the commands and tools it registered indented below it.
 // Plugins that aren't loaded can't report theirs; enable one to see them.
-function menuItems(plugins: Plugin[], manifest: Manifest | undefined, off: Set<string>): SettingItem[] {
-	const toggle = (id: string, label: string, description: string): SettingItem => ({
-		id,
-		label,
-		description,
-		currentValue: off.has(id) ? "off" : "on",
-		values: ["on", "off"],
-	});
+// `parentOf` maps each command/tool row to its plugin row.
+function menuItems(plugins: Plugin[], manifest: Manifest | undefined, off: Set<string>) {
+	const parentOf = new Map<string, string>();
+	const toggle = (id: string, label: string, description: string, parent?: string): SettingItem => {
+		if (parent) parentOf.set(id, parent);
+		const isOff = off.has(id) || (parent !== undefined && off.has(parent));
+		return { id, label, description, currentValue: isOff ? "off" : "on", values: ["on", "off"] };
+	};
 
-	return plugins.flatMap((plugin) => {
+	const items = plugins.flatMap((plugin) => {
+		const id = `plugin:${plugin.name}`;
 		const source = plugin.bundled ? "bundled" : `yours: ${plugin.path}`;
 		const commands = manifest?.commands.filter((c) => c.plugin === plugin.name) ?? [];
 		const tools = manifest?.tools.filter((t) => t.plugin === plugin.name) ?? [];
 		return [
-			toggle(`plugin:${plugin.name}`, plugin.name, source),
-			...commands.map((c) => toggle(`command:${c.name}`, `  /${c.name}`, c.description || "command")),
-			...tools.map((t) => toggle(`tool:${t.name}`, `  ${t.name} (tool)`, t.description)),
+			toggle(id, plugin.name, source),
+			...commands.map((c) => toggle(`command:${c.name}`, `  /${c.name}`, c.description || "command", id)),
+			...tools.map((t) => toggle(`tool:${t.name}`, `  ${t.name} (tool)`, t.description, id)),
 		];
 	});
+
+	return { items, parentOf };
 }
 
 // One dialog that toggles in place (reopening a select per toggle makes the
 // screen blink). Closing it saves and reloads, but only if something changed.
+//
+// Turning a plugin off shows its commands and tools as off too, since they
+// go away with it. Their own settings are kept, so turning the plugin back
+// on restores them as they were.
 async function openMenu(plugins: Plugin[], manifest: Manifest | undefined, ctx: ExtensionCommandContext) {
 	const off = toIds(await readConfig());
 	const initial = [...off].sort().join();
 
 	await ctx.ui.custom<void>((tui, theme, _keybindings, done) => {
-		const items = menuItems(plugins, manifest, off);
+		const { items, parentOf } = menuItems(plugins, manifest, off);
+		const childrenOf = (parent: string) => [...parentOf].filter(([, p]) => p === parent).map(([child]) => child);
+
 		const list = new SettingsList(
 			items,
 			Math.min(items.length + 2, 20),
 			getSettingsListTheme(),
 			(id, value) => {
+				const parent = parentOf.get(id);
+				if (parent && off.has(parent)) {
+					list.updateValue(id, "off"); // can't turn on a command whose plugin is off
+					return;
+				}
+
 				if (value === "off") off.add(id);
 				else off.delete(id);
+
+				for (const child of childrenOf(id)) {
+					list.updateValue(child, value === "off" || off.has(child) ? "off" : "on");
+				}
 			},
 			() => done(),
 		);
@@ -424,7 +454,10 @@ export default async function (pi: ExtensionAPI) {
 		},
 	});
 
-	const lua = LuaRuntime.start(plugins.filter((p) => !config.disabled.includes(p.name)).map((p) => p.path));
+	const lua = LuaRuntime.start(
+		plugins.filter((p) => !config.disabled.includes(p.name)).map((p) => p.path),
+		(content, options) => pi.sendUserMessage(content, options),
+	);
 
 	try {
 		manifest = await lua.ready;

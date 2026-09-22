@@ -13,6 +13,7 @@
 --   ctx.cwd, ctx.model, ctx.has_ui
 --   ctx.session_file   path of the session .jsonl (nil until pi first saves it)
 --   ctx.context        { tokens, window, percent } or nil before the first turn
+--   ctx.send(text)                         send a user message to the agent (queued if it's busy)
 --   ctx.ui.notify(message, level)          level: "info" | "warning" | "error"
 --   ctx.ui.set_status(key, line)           one line in the footer (nil clears)
 --   ctx.ui.set_widget(key, lines)          lines above the editor (nil clears)
@@ -85,6 +86,9 @@ end
 
 local function make_ctx(data)
 	local ctx = data or {}
+	ctx.send = function(text)
+		send({ type = "send", text = tostring(text) })
+	end
 	ctx.ui = {
 		notify = function(message, level)
 			send({ type = "ui", op = "notify", message = tostring(message), level = level or "info" })
