@@ -14,7 +14,7 @@
  *   <package>/lua/plugins/*.lua   (bundled)
  *   ~/.pi/agent/lua/*.lua         (your own; same name overrides a bundled one)
  *
- * `/lua-pi` opens a menu to enable/disable plugins, and each plugin's commands
+ * `/pi-lua` opens a menu to enable/disable plugins, and each plugin's commands
  * and tools individually, saved in ~/.pi/agent/lua-pi.json.
  */
 
@@ -277,7 +277,7 @@ function toSchema(parameters: ToolSpec["parameters"]) {
 	return Type.Unsafe<Record<string, unknown>>({ type: "object", properties, required });
 }
 
-// Plugins and the /lua-pi menu ---------------------------------------------------
+// Plugins and the /pi-lua menu ---------------------------------------------------
 
 interface Plugin {
 	name: string;
@@ -415,10 +415,10 @@ export default async function (pi: ExtensionAPI) {
 	const config = await readConfig();
 	let manifest: Manifest | undefined;
 
-	pi.registerCommand("lua-pi", {
+	pi.registerCommand("pi-lua", {
 		description: "Enable or disable Lua plugins and their commands and tools",
 		handler: async (_args, ctx) => {
-			if (ctx.mode !== "tui") ctx.ui.notify("/lua-pi needs the interactive TUI", "error");
+			if (ctx.mode !== "tui") ctx.ui.notify("/pi-lua needs the interactive TUI", "error");
 			else if (plugins.length === 0) ctx.ui.notify(`No Lua plugins found. Add some to ${USER_DIR}.`, "info");
 			else await openMenu(plugins, manifest, ctx);
 		},

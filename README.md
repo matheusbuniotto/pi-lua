@@ -21,7 +21,7 @@ pi install npm:pi-lua
 
 ## Manage plugins
 
-Run `/lua-pi` to open a menu of every Lua plugin, with the commands and tools each one adds listed underneath:
+Run `/pi-lua` to open a menu of every Lua plugin, with the commands and tools each one adds listed underneath:
 
 ```
   dashboard       on
